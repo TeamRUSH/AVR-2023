@@ -32,7 +32,7 @@ class Sandbox(MQTTModule):
         # find the associated capital. However, this does not work in reverse. So here,
         # we're creating a dictionary of MQTT topics, and the methods we want to run
         # whenever a message arrives on that topic.
-        self.topic_map = {"avr/fcm/velocity": self.show_velocity}
+        self.topic_map = {"avr/fcm/velocity": self.show_velocity,"avr/fusion/attitude/euler": self.servo_offest}
 
     # Here's an example of a custom message handler here.
     # This is what executes whenever a message is received on the "avr/fcm/velocity"
@@ -64,6 +64,17 @@ class Sandbox(MQTTModule):
             "avr/pcm/set_servo_open_close",
             {"servo": 0, "action": "open"},
         )
+
+    def servo_offset(self, payload: AvrFusionAttitudeEulerPayload) -> None:
+        psi = payload["psi"]
+        theta = payload["theta"]
+        phi = payload["phi"]
+
+        angles=(psi, theta, phi)
+
+        logger.debug(f"Attitude information: {angles} radians")
+
+
 
 
 if __name__ == "__main__":
