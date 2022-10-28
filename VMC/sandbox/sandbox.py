@@ -3,7 +3,8 @@
 # It also helps us make sure that our code is sending the proper payload on a topic
 # and is receiving the proper payload as well.
 from bell.avr.mqtt.client import MQTTModule
-from bell.avr.mqtt.payloads import AvrFcmVelocityPayload
+from bell.avr.mqtt.payloads import AvrFcmVelocityPayload #,
+    #AvrApriltagsVisiblePayload
 
 # This imports the third-party Loguru library which helps make logging way easier
 # and more useful.
@@ -32,7 +33,8 @@ class Sandbox(MQTTModule):
         # find the associated capital. However, this does not work in reverse. So here,
         # we're creating a dictionary of MQTT topics, and the methods we want to run
         # whenever a message arrives on that topic.
-        self.topic_map = {"avr/fcm/velocity": self.show_velocity,"avr/fusion/attitude/euler": self.servo_offest}
+        self.topic_map = {"avr/fcm/velocity": self.show_velocity}
+        # self.topic_map = {"avr/fcm/velocity": self.show_velocity, "avr/apriltags/visible" : self.apriltag_visible}
 
     # Here's an example of a custom message handler here.
     # This is what executes whenever a message is received on the "avr/fcm/velocity"
@@ -50,7 +52,7 @@ class Sandbox(MQTTModule):
         # This is what is known as a "f-string". This allows you to easily inject
         # variables into a string without needing to combine lots of strings together.
         # https://realpython.com/python-f-strings/#f-strings-a-new-and-improved-way-to-format-strings-in-python
-        logger.debug(f"Velocity information: {v_ms} m/s")
+        # logger.debug(f"Velocity information: {v_ms} m/s")
 
     # Here is an example on how to publish a message to an MQTT topic to
     # perform an action
@@ -65,14 +67,9 @@ class Sandbox(MQTTModule):
             {"servo": 0, "action": "open"},
         )
 
-    def servo_offset(self, payload: AvrFusionAttitudeEulerPayload) -> None:
-        psi = payload["psi"]
-        theta = payload["theta"]
-        phi = payload["phi"]
-
-        angles=(psi, theta, phi)
-
-        logger.debug(f"Attitude information: {angles} radians")
+"""     def apriltag_visible(self, payload: AvrApriltagsVisiblePayload) -> None:
+        a1 = payload["tags"]
+        logger.debug(f"Tag id: {a1}") """
 
 
 
