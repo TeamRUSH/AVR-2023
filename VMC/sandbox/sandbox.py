@@ -44,6 +44,7 @@ class Sandbox(MQTTModule):
         self.topic_map = {"avr/fcm/velocity": self.show_velocity, "avr/apriltags/visible" : self.apriltag_visible, "avr/pcm/set_servo_open_close" : self.servo_buttons, "avr/pcm/set_servo_pct" : self.second_servo}
         self.dump_fwd = True
         self.dumped = False
+        self.dumping = False
 
 
 
@@ -74,6 +75,8 @@ class Sandbox(MQTTModule):
         command = payload["action"]
         if servo_id == 0:
             if command == "open":
+                self.dumping = True
+                self.blink3X()
                 if self.dump_fwd:
                     self.servo_pct(4,100)
                 else:
@@ -81,9 +84,28 @@ class Sandbox(MQTTModule):
                 self.dump_fwd = not self.dump_fwd
 
             elif command == "close":
+                self.dumping = True
+                self.blink3X()
                 self.servo_pct(4,99)
         elif servo_id == 1:
             self.dumped = command == "close"
+            if self.dumped:
+                self.dumping = True
+                self.blink3X()
+                self.servo_pct(5,0)
+                start = time.time()
+                while time.time() < start + 0.5:
+                    pass
+                self.dumping = False
+            else:
+                self.servo_pct(5,100)
+
+    def blink3X(self):
+        for x in range(3):
+            start = time.time()
+            while time.time() < start + 0.26:
+                pass
+            self.led_blink((0,255,255,255),0.13)
 
     def second_servo(self, payload: AvrPcmSetServoPctPayload) -> None:
         servo_id = payload["servo"]
@@ -114,6 +136,9 @@ class Sandbox(MQTTModule):
                     pass
                 self.servo_pct(4,55)
 
+            elif percent == 55:
+                self.dumping = False
+
 
     def servo_pct(self,id,pct):
         self.send_message(
@@ -130,40 +155,43 @@ class Sandbox(MQTTModule):
         Y_raw = rel["y"]
         Z_raw = rel["z"]
         head = math.radians(tags[0]["heading"])
-        X_rot = X_raw*math.sin(head)+Y_raw*math.cos(head)
+        X_rot = -X_raw*math.sin(head)+Y_raw*math.cos(head)
         Y_rot = X_raw*math.cos(head)+Y_raw*math.sin(head)
 
         height = (-Z_raw*0.906307787)+(Y_rot*0.422618262)
         f_dist = 41+(Z_raw*0.422618262)+(Y_rot*0.906307787)
         s_dist = X_rot
 
-        abs_pos = (head, X_rot, Y_rot, f_dist, s_dist)
+
+        abs_pos = (f_dist, s_dist)
         color = (0,0,0,0)
-        if id == 0:
-            color = (0,255,0,0)
-        elif id == 2:
-            color = (0,255,0,0)
-        elif id == 3:
-            color = (0,255,0,0)
-        elif id == 4:
-            color = (0,255,0,0)
+        if not self.dumping:
+            if id == 0:
+                color = (0,255,0,0)
+            elif id == 2:
+                color = (0,255,0,0)
+            elif id == 3:
+                color = (0,255,0,0)
+            elif id == 4:
+                color = (0,255,0,0)
 
-        if (abs(f_dist) <= 10.0) and (s_dist <= 20.0) and (s_dist >= 0.0):
-            color = (0,0,255,0)
-        elif (abs(f_dist) <= 10.0) and (s_dist <= 40.0) and (s_dist >= 20):
-            color = (0,0,0,255)
-        elif (abs(f_dist) <= 10.0) and (s_dist <= 0) and (s_dist >= -20.0) and not self.dumped:
-            color = (0,255,255,0)
+            if (abs(f_dist) <= 10.0) and (s_dist <= 19.0) and (s_dist >= -3.0):
+                color = (0,0,255,0)
+            elif (abs(f_dist) <= 10.0) and (s_dist <= 30.0) and (s_dist >= 19.0):
+                color = (0,0,0,255)
+            elif (abs(f_dist) <= 10.0) and (s_dist <= -3.0) and (s_dist >= -25.0) and not self.dumped:
+                color = (0,255,255,0)
 
-        self.send_message(
-                "avr/pcm/set_temp_color",
-                {"wrgb": color, "time": 0.35}
-        )
+            self.led_blink(color,0.35)
 
 
         logger.debug(f"Pos: {abs_pos}")
 
-
+    def led_blink(self,color,time):
+        self.send_message(
+                "avr/pcm/set_temp_color",
+                {"wrgb": color, "time": time}
+        )
 
 
 if __name__ == "__main__":
