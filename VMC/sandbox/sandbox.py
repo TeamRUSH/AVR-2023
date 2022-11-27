@@ -1,7 +1,4 @@
-# Here we import our own MQTT library which takes care of a lot of boilerplate
-# code related to connecting to the MQTT server and sending/receiving messages.
-# It also helps us make sure that our code is sending the proper payload on a topic
-# and is receiving the proper payload as well.
+# Team RUSH Bell AVR 2022 Sancbox Code
 from bell.avr.mqtt.client import MQTTModule
 from bell.avr.mqtt.payloads import (
     AvrFcmVelocityPayload,
@@ -12,69 +9,29 @@ from bell.avr.mqtt.payloads import (
 import time
 import math
 
-
-# This imports the third-party Loguru library which helps make logging way easier
-# and more useful.
-# https://loguru.readthedocs.io/en/stable/
 from loguru import logger
 
-
-# This creates a new class that will contain multiple functions
-# which are known as "methods". This inherits from the MQTTModule class
-# that we imported from our custom MQTT library.
 class Sandbox(MQTTModule):
-    # The "__init__" method of any class is special in Python. It's what runs when
-    # you create a class like `sandbox = Sandbox()`. In here, we usually put
-    # first-time initialization and setup code. The "self" argument is a magic
-    # argument that must be the first argument in any class method. This allows the code
-    # inside the method to access class information.
     def __init__(self) -> None:
-        # This calls the original `__init__()` method of the MQTTModule class.
-        # This runs some setup code that we still want to occur, even though
-        # we're replacing the `__init__()` method.
         super().__init__()
-        # Here, we're creating a dictionary of MQTT topic names to method handles.
-        # A dictionary is a data structure that allows use to
-        # obtain values based on keys. Think of a dictionary of state names as keys
-        # and their capitals as values. By using the state name as a key, you can easily
-        # find the associated capital. However, this does not work in reverse. So here,
-        # we're creating a dictionary of MQTT topics, and the methods we want to run
-        # whenever a message arrives on that topic.
-        # self.topic_map = {"avr/fcm/velocity": self.show_velocity}
         self.topic_map = {"avr/fcm/velocity": self.show_velocity, "avr/apriltags/visible" : self.apriltag_visible, "avr/pcm/set_servo_open_close" : self.servo_buttons, "avr/pcm/set_servo_pct" : self.second_servo}
         self.dump_fwd = True
         self.dumped = False
         self.dumping = False
 
-
-
-    # Here's an example of a custom message handler here.
-    # This is what executes whenever a message is received on the "avr/fcm/velocity"
-    # topic. The content of the message is passed to the `payload` argument.
-    # The `AvrFcmVelocityMessage` class here is beyond the scope of AVR.
+    # Get Drone velocity components
     def show_velocity(self, payload: AvrFcmVelocityPayload) -> None:
         vx = payload["vX"]
         vy = payload["vY"]
         vz = payload["vZ"]
         v_ms = (vx, vy, vz)
 
-        # Use methods like `debug`, `info`, `success`, `warning`, `error`, and
-        # `critical` to log data that you can see while your code runs.
-
-        # This is what is known as a "f-string". This allows you to easily inject
-        # variables into a string without needing to combine lots of strings together.
-        # https://realpython.com/python-f-strings/#f-strings-a-new-and-improved-way-to-format-strings-in-python
-        # logger.debug(f"Velocity information: {v_ms} m/s")
-
-    # Here is an example on how to publish a message to an MQTT topic to
-    # perform an action
-
-
+#Listen to servo open/close buttons
     def servo_buttons(self, payload: AvrPcmSetServoOpenClosePayload) -> None:
         servo_id = payload["servo"]
         command = payload["action"]
-        if servo_id == 0:
-            if command == "open":
+        if servo_id == 0: #Dump Large Dumper
+            if command == "open": #Dump Half
                 self.dumping = True
                 self.blink3X()
                 if self.dump_fwd:
@@ -83,11 +40,11 @@ class Sandbox(MQTTModule):
                     self.servo_pct(4,0)
                 self.dump_fwd = not self.dump_fwd
 
-            elif command == "close":
+            elif command == "close": #Dump Full
                 self.dumping = True
                 self.blink3X()
                 self.servo_pct(4,99)
-        elif servo_id == 1:
+        elif servo_id == 1: #Dump Small Dumper
             self.dumped = command == "close"
             if self.dumped:
                 self.dumping = True
@@ -100,6 +57,7 @@ class Sandbox(MQTTModule):
             else:
                 self.servo_pct(5,100)
 
+    #Blink Lights 3X before dropping
     def blink3X(self):
         for x in range(3):
             start = time.time()
@@ -107,6 +65,7 @@ class Sandbox(MQTTModule):
                 pass
             self.led_blink((0,255,255,255),0.13)
 
+    #Handle custom servo commands
     def second_servo(self, payload: AvrPcmSetServoPctPayload) -> None:
         servo_id = payload["servo"]
         percent = payload["percent"]
@@ -139,13 +98,14 @@ class Sandbox(MQTTModule):
             elif percent == 55:
                 self.dumping = False
 
-
+    #Helper Method to Move a Servo
     def servo_pct(self,id,pct):
         self.send_message(
             "avr/pcm/set_servo_pct",
             {"servo": id, "percent": pct}
         )
 
+    #Reacting to Apriltags
     def apriltag_visible(self, payload: AvrApriltagsVisiblePayload) -> None:
         tags = payload["tags"]
         dist = tags[0]["horizontal_dist"]
@@ -154,55 +114,39 @@ class Sandbox(MQTTModule):
         X_raw = rel["x"]
         Y_raw = rel["y"]
         Z_raw = rel["z"]
+
+        #Calculate relative location to Apriltag in Camera Reference Frame
         head = math.radians(tags[0]["heading"])
         X_rot = -X_raw*math.sin(head)+Y_raw*math.cos(head)
         Y_rot = X_raw*math.cos(head)+Y_raw*math.sin(head)
-
+        #Relative location in Drone Reference Frame
         height = (-Z_raw*0.906307787)+(Y_rot*0.422618262)
         f_dist = 41+(Z_raw*0.422618262)+(Y_rot*0.906307787)
         s_dist = X_rot
 
-
         abs_pos = (f_dist, s_dist)
-        color = (0,0,0,0)
+        color = (0,0,0,0) #Blank color if nothing visible
         if not self.dumping:
-            if id == 0:
-                color = (0,255,0,0)
-            elif id == 2:
-                color = (0,255,0,0)
-            elif id == 3:
-                color = (0,255,0,0)
-            elif id == 4:
+            if id <=6:
                 color = (0,255,0,0)
 
-            if (abs(f_dist) <= 10.0) and (s_dist <= 19.0) and (s_dist >= -3.0):
-                color = (0,0,255,0)
-            elif (abs(f_dist) <= 10.0) and (s_dist <= 30.0) and (s_dist >= 19.0):
-                color = (0,0,0,255)
-            elif (abs(f_dist) <= 10.0) and (s_dist <= -3.0) and (s_dist >= -25.0) and not self.dumped:
-                color = (0,255,255,0)
+            # if (abs(f_dist) <= 10.0) and (s_dist <= 19.0) and (s_dist >= -3.0):
+            #     color = (0,0,255,0)
+            # elif (abs(f_dist) <= 10.0) and (s_dist <= 30.0) and (s_dist >= 19.0):
+            #     color = (0,0,0,255)
+            # elif (abs(f_dist) <= 10.0) and (s_dist <= -3.0) and (s_dist >= -25.0) and not self.dumped:
+            #     color = (0,255,255,0)
 
-            self.led_blink(color,0.35)
-
-
+            self.led_blink(color,2)
         logger.debug(f"Pos: {abs_pos}")
 
+    #Helper Method to Blink LED
     def led_blink(self,color,time):
         self.send_message(
                 "avr/pcm/set_temp_color",
                 {"wrgb": color, "time": time}
         )
 
-
 if __name__ == "__main__":
-    # This is what actually initializes the Sandbox class, and executes it.
-    # This is nested under the above condition, as otherwise, if this file
-    # were imported by another file, these lines would execute, as the interpreter
-    # reads and executes the file top-down. However, whenever a file is called directly
-    # with `python file.py`, the magic `__name__` variable is set to "__main__".
-    # Thus, this code will only execute if the file is called directly.
     box = Sandbox()
-    # The `run` method is defined by the inherited `MQTTModule` class and is a
-    # convience function to start processing incoming MQTT messages infinitely.
     box.run()
-
