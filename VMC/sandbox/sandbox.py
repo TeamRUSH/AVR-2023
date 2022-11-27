@@ -1,4 +1,4 @@
-# Team RUSH Bell AVR 2022 Sancbox Code
+# Team RUSH Bell AVR 2022 Sandbox Code
 from bell.avr.mqtt.client import MQTTModule
 from bell.avr.mqtt.payloads import (
     AvrFcmVelocityPayload,
