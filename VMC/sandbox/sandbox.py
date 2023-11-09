@@ -15,9 +15,7 @@ class Sandbox(MQTTModule):
     def __init__(self) -> None:
         super().__init__()
         self.topic_map = {"avr/fcm/velocity": self.show_velocity, "avr/apriltags/visible" : self.apriltag_visible, "avr/pcm/set_servo_open_close" : self.servo_buttons, "avr/pcm/set_servo_pct" : self.second_servo}
-        self.dump_fwd = True
-        self.dumped = False
-        self.dumping = False
+        self.servo_init(4);
 
     # Get Drone velocity components
     def show_velocity(self, payload: AvrFcmVelocityPayload) -> None:
@@ -30,32 +28,16 @@ class Sandbox(MQTTModule):
     def servo_buttons(self, payload: AvrPcmSetServoOpenClosePayload) -> None:
         servo_id = payload["servo"]
         command = payload["action"]
-        if servo_id == 0: #Dump Large Dumper
-            if command == "open": #Dump Half
-                self.dumping = True
+        if servo_id == 0: #Intake Start
+            if command == "open": #Intake Fwd
+                #self.servo_abs(4,1394+250)
+                self.servo_abs(4,2000)
+            elif command == "close": #Intake Rev
                 self.blink3X()
-                if self.dump_fwd:
-                    self.servo_pct(4,100)
-                else:
-                    self.servo_pct(4,0)
-                self.dump_fwd = not self.dump_fwd
-
-            elif command == "close": #Dump Full
-                self.dumping = True
-                self.blink3X()
-                self.servo_pct(4,99)
-        elif servo_id == 1: #Dump Small Dumper
-            self.dumped = command == "close"
-            if self.dumped:
-                self.dumping = True
-                self.blink3X()
-                self.servo_pct(5,0)
-                start = time.time()
-                while time.time() < start + 0.5:
-                    pass
-                self.dumping = False
-            else:
-                self.servo_pct(5,100)
+                #self.servo_abs(4,1394-210)
+                self.servo_abs(4,1000)
+        if servo_id == 1: #Intake Stop
+            self.servo_init(4)
 
     #Blink Lights 3X before dropping
     def blink3X(self):
@@ -69,40 +51,31 @@ class Sandbox(MQTTModule):
     def second_servo(self, payload: AvrPcmSetServoPctPayload) -> None:
         servo_id = payload["servo"]
         percent = payload["percent"]
-        start = time.time()
-        if servo_id == 4:
-            if percent == 100:
-                end = start + 1.0
-                while time.time() < end:
-                    pass
-                self.servo_pct(4,55)
+        # start = time.time()
+        # if servo_id == 4:
+        #     end = start + 1.0
+        #     while time.time() < end:
+        #         pass
+        #     self.servo_pct(4,55)
 
-            elif percent == 99:
-                end = start + 0.75
-                while time.time() < end:
-                    pass
-                self.servo_pct(4,0)
-
-            elif percent == 1:
-                end = start + 0.75
-                while time.time() < end:
-                    pass
-                self.servo_pct(4,100)
-
-            elif percent == 0:
-                end = start + 1.0
-                while time.time() < end:
-                    pass
-                self.servo_pct(4,55)
-
-            elif percent == 55:
-                self.dumping = False
 
     #Helper Method to Move a Servo
     def servo_pct(self,id,pct):
         self.send_message(
             "avr/pcm/set_servo_pct",
             {"servo": id, "percent": pct}
+        )
+
+    def servo_abs(self,id,abs):
+        self.send_message(
+            "avr/pcm/set_servo_abs",
+            {"servo": id, "absolute": abs}
+        )
+
+    def servo_init(self,id):
+        self.send_message(
+            "avr/pcm/set_servo_abs",
+            {"servo": id, "absolute": 1394}
         )
 
     #Reacting to Apriltags
