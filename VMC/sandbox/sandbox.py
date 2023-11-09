@@ -32,12 +32,24 @@ class Sandbox(MQTTModule):
             if command == "open": #Intake Fwd
                 #self.servo_abs(4,1394+250)
                 self.servo_abs(4,2000)
+                self.send_message(
+                        "avr/pcm/set_base_color",
+                        {"wrgb": (0,255,0,0)}
+                )
             elif command == "close": #Intake Rev
-                self.blink3X()
+                #self.blink3X()
+                self.send_message(
+                        "avr/pcm/set_base_color",
+                        {"wrgb": (0,0,255,0)}
+                )
                 #self.servo_abs(4,1394-210)
                 self.servo_abs(4,1000)
         if servo_id == 1: #Intake Stop
             self.servo_init(4)
+            self.send_message(
+                    "avr/pcm/set_base_color",
+                    {"wrgb": (0,0,0,0)}
+            )
 
     #Blink Lights 3X before dropping
     def blink3X(self):
